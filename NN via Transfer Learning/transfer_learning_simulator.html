@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transfer Learning Classroom Simulator</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      color-scheme: light dark;
+      accent-color: #0d9488;
+    }
+
+    /* Progressive enhancement fallback per brand-consistent-forms guidance */
+    @supports not (accent-color: #0d9488) {
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 8px;
+        background: linear-gradient(to right, #0d9488 var(--progress, 50%), #94a3b8 var(--progress, 50%));
+        border-radius: 4px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: #0d9488;
+        cursor: pointer;
+        margin-top: -4px;
+      }
+      input[type="range"]::-moz-range-track {
+        width: 100%;
+        height: 8px;
+        background: #94a3b8;
+        border-radius: 4px;
+      }
+      input[type="range"]::-moz-range-thumb {
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: #0d9488;
+        cursor: pointer;
+      }
+      input[type="range"]::-moz-range-progress {
+        background-color: #0d9488;
+        height: 8px;
+        border-radius: 4px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-5 space-y-5">
+
+  <!-- Header Banner -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+      <span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-[var(--secondary)] text-[var(--foreground)] mb-1">
+        Interactive Classroom Simulator
+      </span>
+      <h1 class="text-xl font-bold text-[var(--foreground)]">Neural Networks via Transfer Learning</h1>
+      <p class="text-sm text-[var(--muted-foreground)]">
+        Compare Training from Scratch, Feature Extraction, Fine-Tuning, and Catastrophic Forgetting across 100 epochs.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button id="btnRunSim" type="button" class="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm hover:opacity-90 transition">
+        Animate 100 Epochs
+      </button>
+      <button id="btnReset" type="button" class="px-3 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:opacity-80 transition">
+        Reset
+      </button>
+    </div>
+  </div>
+
+  <!-- 4 One-Click Classroom Presets -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+    <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-2.5">
+      One-Click Classroom Demos
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <button type="button" data-preset="scratch" class="preset-btn text-left p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] transition">
+        <div class="font-semibold text-sm text-[var(--foreground)]">1. Train From Scratch</div>
+        <div class="text-xs text-[var(--muted-foreground)] mt-0.5">Start with zero knowledge. Slow and struggles on small data.</div>
+      </button>
+      <button type="button" data-preset="extraction" class="preset-btn text-left p-3 rounded-lg border border-[var(--primary)] bg-[var(--secondary)] transition">
+        <div class="font-semibold text-sm text-[var(--foreground)]">2. Feature Extraction</div>
+        <div class="text-xs text-[var(--muted-foreground)] mt-0.5">Keep pre-trained knowledge locked. Fast and great for small data.</div>
+      </button>
+      <button type="button" data-preset="finetune" class="preset-btn text-left p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] transition">
+        <div class="font-semibold text-sm text-[var(--foreground)]">3. Fine-Tuning (Gentle)</div>
+        <div class="text-xs text-[var(--muted-foreground)] mt-0.5">Unlock and gently adjust with a tiny learning rate (<code>1e-5</code>).</div>
+      </button>
+      <button type="button" data-preset="forgetting" class="preset-btn text-left p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] transition">
+        <div class="font-semibold text-sm text-[var(--foreground)]">4. Catastrophic Forgetting</div>
+        <div class="text-xs text-[var(--muted-foreground)] mt-0.5">Fine-tune with a huge learning rate (<code>1e-2</code>) — erases past knowledge.</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Grid: Simple Controls (Left) + Results & Chart (Right) -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+    <!-- Left Column: 3 Simple Controls -->
+    <form id="simForm" class="lg:col-span-5 bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-5" onsubmit="return false;">
+      <h2 class="font-semibold text-base text-[var(--foreground)] border-b border-[var(--border)] pb-2">
+        1. Choose Your Settings
+      </h2>
+
+      <!-- Control 1: Strategy -->
+      <div>
+        <div class="flex justify-between text-sm mb-1">
+          <label for="strategySlider" class="font-medium text-[var(--foreground)]">Learning Approach:</label>
+          <span id="strategyLabel" class="font-semibold text-[var(--foreground)]">Feature Extraction (Frozen)</span>
+        </div>
+        <input type="range" id="strategySlider" min="0" max="2" step="1" value="1" class="w-full cursor-pointer" />
+        <div class="flex justify-between text-xs text-[var(--muted-foreground)] mt-1">
+          <span>From Scratch</span>
+          <span>Feature Extraction</span>
+          <span>Fine-Tuning</span>
+        </div>
+      </div>
+
+      <!-- Control 2: Dataset Size -->
+      <div>
+        <div class="flex justify-between text-sm mb-1">
+          <label for="dataSlider" class="font-medium text-[var(--foreground)]">Amount of New Training Data:</label>
+          <span id="dataLabel" class="font-semibold text-[var(--foreground)]">Small (500 photos)</span>
+        </div>
+        <input type="range" id="dataSlider" min="0" max="2" step="1" value="0" class="w-full cursor-pointer" />
+        <div class="flex justify-between text-xs text-[var(--muted-foreground)] mt-1">
+          <span>Small (500)</span>
+          <span>Medium (5,000)</span>
+          <span>Large (50,000)</span>
+        </div>
+      </div>
+
+      <!-- Control 3: Learning Rate (Step Size) -->
+      <div>
+        <div class="flex justify-between text-sm mb-1">
+          <label for="lrSlider" class="font-medium text-[var(--foreground)]">Learning Rate (Step Size):</label>
+          <span id="lrLabel" class="font-mono font-semibold text-[var(--foreground)]">Normal (1e-3)</span>
+        </div>
+        <input type="range" id="lrSlider" min="0" max="2" step="1" value="1" class="w-full cursor-pointer" />
+        <div class="flex justify-between text-xs text-[var(--muted-foreground)] mt-1">
+          <span>Tiny / Gentle (1e-5)</span>
+          <span>Normal (1e-3)</span>
+          <span>Huge / Aggressive (1e-2)</span>
+        </div>
+      </div>
+
+      <!-- Plain-English Explanation Box -->
+      <div class="p-4 rounded-lg border border-[var(--border)] bg-[var(--secondary)] space-y-1.5">
+        <div class="text-xs font-bold uppercase tracking-wide text-[var(--foreground)]">
+          What is Happening Under the Hood?
+        </div>
+        <p id="decisionText" class="text-sm text-[var(--muted-foreground)] leading-relaxed">
+          Loading explanation...
+        </p>
+      </div>
+    </form>
+
+    <!-- Right Column: 3 Scorecards + Live Accuracy Graph -->
+    <div class="lg:col-span-7 space-y-5">
+
+      <!-- 3 Simple Scorecards -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 text-center shadow-sm">
+          <div class="text-xs text-[var(--muted-foreground)]">Training Time Needed</div>
+          <div id="statTime" class="text-lg font-bold text-[var(--foreground)] mt-1">~4 Hours</div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 text-center shadow-sm">
+          <div class="text-xs text-[var(--muted-foreground)]">Final Test Score (Accuracy)</div>
+          <div id="statAcc" class="text-lg font-bold text-[var(--foreground)] mt-1">89.2%</div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 text-center shadow-sm">
+          <div class="text-xs text-[var(--muted-foreground)]">Model Status</div>
+          <div id="statRisk" class="text-sm font-bold text-[var(--foreground)] mt-1.5">Fast & Reliable</div>
+        </div>
+      </div>
+
+      <!-- Canvas Plot: Validation Accuracy Over 100 Epochs -->
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-2">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold text-base text-[var(--foreground)]">
+            2. Test Accuracy Over 100 Rounds of Training (Epochs)
+          </h2>
+          <span id="epochStatus" class="text-xs font-mono text-[var(--muted-foreground)]">Epoch 100 / 100</span>
+        </div>
+        <canvas id="accCanvas" width="680" height="270" class="w-full rounded-lg border border-[var(--border)]"></canvas>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const TOTAL_EPOCHS = 100;
+
+    const strategySlider = document.getElementById('strategySlider');
+    const dataSlider = document.getElementById('dataSlider');
+    const lrSlider = document.getElementById('lrSlider');
+
+    const strategyLabel = document.getElementById('strategyLabel');
+    const dataLabel = document.getElementById('dataLabel');
+    const lrLabel = document.getElementById('lrLabel');
+    const decisionText = document.getElementById('decisionText');
+    const statTime = document.getElementById('statTime');
+    const statAcc = document.getElementById('statAcc');
+    const statRisk = document.getElementById('statRisk');
+    const epochStatus = document.getElementById('epochStatus');
+    const canvas = document.getElementById('accCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const strategyNames = [
+      'Train From Scratch (Zero Knowledge)',
+      'Feature Extraction (Keep Base Locked)',
+      'Fine-Tuning (Unlock & Adapt)'
+    ];
+    const dataNames = ['Small (500 photos)', 'Medium (5,000 photos)', 'Large (50,000 photos)'];
+    const lrNames = ['Tiny / Gentle (1e-5)', 'Normal (1e-3)', 'Huge / Aggressive (1e-2)'];
+
+    let animFrame = null;
+    let currentMaxEpoch = TOTAL_EPOCHS;
+
+    function updateSliderProgress(slider) {
+      if (!CSS.supports('accent-color', '#0d9488')) {
+        const min = Number(slider.min || 0);
+        const max = Number(slider.max || 100);
+        const val = Number(slider.value || 0);
+        const pct = ((val - min) / (max - min)) * 100;
+        slider.style.setProperty('--progress', `${pct}%`);
+      }
+    }
+
+    function computeCurves() {
+      const strat = Number(strategySlider.value); // 0: Scratch, 1: Feature Extraction, 2: Fine-Tuning
+      const dataIdx = Number(dataSlider.value);   // 0: Small, 1: Medium, 2: Large
+      const lrIdx = Number(lrSlider.value);       // 0: Tiny (1e-5), 1: Normal (1e-3), 2: Huge (1e-2)
+
+      // Baseline reference curve: Training from Scratch with normal LR over 100 epochs
+      const scratchCurve = [];
+      const scratchMax = dataIdx === 0 ? 54 : (dataIdx === 1 ? 76 : 90);
+      for (let ep = 1; ep <= TOTAL_EPOCHS; ep++) {
+        scratchCurve.push(15 + (scratchMax - 15) * (1 - Math.exp(-ep / 36.0)));
+      }
+
+      const activeCurve = [];
+      let status = 'Fast & Reliable';
+      let explanation = '';
+      let timeText = '~4 Hours';
+
+      if (strat === 0) {
+        // Train From Scratch over 100 epochs
+        timeText = '~72 Hours';
+        const speed = lrIdx === 0 ? 65.0 : (lrIdx === 1 ? 36.0 : 24.0);
+        const penalty = lrIdx === 2 ? -10 : (lrIdx === 0 ? -12 : 0);
+        for (let ep = 1; ep <= TOTAL_EPOCHS; ep++) {
+          activeCurve.push(Math.max(12, 15 + (scratchMax + penalty - 15) * (1 - Math.exp(-ep / speed))));
+        }
+        status = dataIdx === 0 ? 'Overfitting (Too Little Data)' : 'Very Slow Training';
+        explanation = dataIdx === 0
+          ? 'Starting from zero with only 500 photos is like cramming flashcards without knowing what shapes or edges are. Even after 100 epochs, the model memorizes the 500 training photos and stalls on new test photos (~54%).'
+          : 'Even with more photos, starting from absolute zero takes 100+ epochs and days of expensive GPU time (~72 hours) just to re-learn basic lines, colors, and shapes.';
+      } else if (strat === 1) {
+        // Feature Extraction (Frozen Pre-trained Model) over 100 epochs
+        timeText = '~4 Hours';
+        const baseStart = 68;
+        const targetMax = dataIdx === 0 ? 89.2 : (dataIdx === 1 ? 90.5 : 91.5);
+        const speed = lrIdx === 0 ? 22.0 : (lrIdx === 1 ? 9.5 : 7.5);
+        const penalty = lrIdx === 2 ? -4.5 : 0;
+        for (let ep = 1; ep <= TOTAL_EPOCHS; ep++) {
+          activeCurve.push(baseStart + (targetMax + penalty - baseStart) * (1 - Math.exp(-ep / speed)));
+        }
+        status = 'Safe & Fast (Best for Small Data)';
+        explanation = 'Feature Extraction keeps the pre-trained model locked (`trainable = False`) so it cannot forget how to see edges and shapes. It converges rapidly within the first 20–30 epochs and reaches ~89% accuracy even on just 500 photos.';
+      } else {
+        // Fine-Tuning (Unlocked Pre-trained Model) over 100 epochs
+        timeText = '~12 Hours';
+        if (lrIdx === 2) {
+          // Huge LR (1e-2) -> Catastrophic Forgetting!
+          for (let ep = 1; ep <= TOTAL_EPOCHS; ep++) {
+            if (ep === 1) activeCurve.push(72);
+            else activeCurve.push(32 + (dataIdx * 8) * (1 - Math.exp(-(ep - 1) / 32.0)));
+          }
+          status = 'CRITICAL: Catastrophic Forgetting';
+          explanation = 'Catastrophic Forgetting: Because the pre-trained model is unlocked AND the Learning Rate is huge (1e-2), massive updates wipe out its pre-trained memory immediately and it never recovers across all 100 epochs. Fix: Lower the Learning Rate slider to Tiny (1e-5).';
+        } else if (lrIdx === 1) {
+          // Normal LR (1e-3) -> Initial gradient shock dip then partial recovery
+          for (let ep = 1; ep <= TOTAL_EPOCHS; ep++) {
+            if (ep <= 5) activeCurve.push(74 - ep * 2.5);
+            else activeCurve.push(61.5 + (24 + dataIdx * 3) * (1 - Math.exp(-(ep - 5) / 18.0)));
+          }
+          status = 'Unstable (Step Size Too Big)';
+          explanation = 'A Normal Learning Rate (1e-3) is still a bit too rough when editing an already-trained model, causing an early accuracy dip. Slide the Learning Rate down to Tiny (1e-5) for smooth Fine-Tuning.';
+        } else {
+          // Tiny / Gentle LR (1e-5) -> Best Practice Fine-Tuning!
+          const maxScore = dataIdx === 0 ? 86.5 : (dataIdx === 1 ? 96.2 : 98.0);
+          for (let ep = 1; ep <= TOTAL_EPOCHS; ep++) {
+            activeCurve.push(70 + (maxScore - 70) * (1 - Math.exp(-ep / 14.0)));
+          }
+          status = dataIdx === 0 ? 'Slight Overfit (Data Too Small)' : 'Peak Accuracy Achieved';
+          explanation = dataIdx === 0
+            ? 'With only 500 photos, unlocking the model slightly overfits compared to keeping it locked (Feature Extraction). Increase the Training Data slider to Medium or Large to see Fine-Tuning shine.'
+            : 'Best-Practice Fine-Tuning: With enough photos and a Tiny Learning Rate (1e-5), the model gently adapts its pre-trained knowledge to your new task and reaches 96%+ accuracy.';
+        }
+      }
+
+      return { scratchCurve, activeCurve, status, explanation, timeText };
+    }
+
+    function updateUI(maxEpoch = TOTAL_EPOCHS) {
+      [strategySlider, dataSlider, lrSlider].forEach(updateSliderProgress);
+
+      strategyLabel.textContent = strategyNames[Number(strategySlider.value)];
+      dataLabel.textContent = dataNames[Number(dataSlider.value)];
+      lrLabel.textContent = lrNames[Number(lrSlider.value)];
+
+      const { scratchCurve, activeCurve, status, explanation, timeText } = computeCurves();
+      decisionText.textContent = explanation;
+      statTime.textContent = timeText;
+
+      const shownIdx = Math.max(0, Math.min(TOTAL_EPOCHS - 1, maxEpoch - 1));
+      statAcc.textContent = `${activeCurve[shownIdx].toFixed(1)}%`;
+      statRisk.textContent = status;
+      epochStatus.textContent = `Epoch ${maxEpoch} / ${TOTAL_EPOCHS}`;
+
+      drawChart(scratchCurve, activeCurve, maxEpoch);
+    }
+
+    function drawChart(scratchCurve, activeCurve, maxEpoch) {
+      const isLight = document.documentElement.classList.contains('light');
+      const bg = isLight ? '#ffffff' : '#18181b';
+      const gridColor = isLight ? '#e2e8f0' : '#27272a';
+      const textColor = isLight ? '#1e293b' : '#e4e4e7';
+      const activeColor = '#0d9488';  // Teal accent
+      const scratchColor = '#d97706'; // Warm amber baseline
+
+      const W = canvas.width;
+      const H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      const padL = 48, padR = 28, padT = 26, padB = 34;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
+      ctx.font = '12px sans-serif';
+      ctx.fillStyle = textColor;
+
+      for (let pct = 0; pct <= 100; pct += 25) {
+        const y = padT + plotH - (pct / 100) * plotH;
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(padL, y);
+        ctx.lineTo(W - padR, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillText(`${pct}%`, 10, y + 4);
+      }
+
+      [1, 20, 40, 60, 80, 100].forEach(ep => {
+        const x = padL + ((ep - 1) / (TOTAL_EPOCHS - 1)) * plotW;
+        ctx.fillText(`Ep ${ep}`, x - 16, H - 10);
+      });
+
+      function plotLine(curve, color, dashed) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.6;
+        ctx.setLineDash(dashed ? [6, 4] : []);
+        ctx.beginPath();
+        for (let i = 0; i < maxEpoch; i++) {
+          const x = padL + (i / (TOTAL_EPOCHS - 1)) * plotW;
+          const y = padT + plotH - (curve[i] / 100) * plotH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw markers every 10 epochs + final shown epoch for visual clarity
+        ctx.fillStyle = color;
+        for (let i = 0; i < maxEpoch; i++) {
+          if (i === 0 || (i + 1) % 10 === 0 || i === maxEpoch - 1) {
+            const x = padL + (i / (TOTAL_EPOCHS - 1)) * plotW;
+            const y = padT + plotH - (curve[i] / 100) * plotH;
+            ctx.beginPath();
+            ctx.arc(x, y, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      plotLine(scratchCurve, scratchColor, true);
+      plotLine(activeCurve, activeColor, false);
+
+      // Legend
+      ctx.fillStyle = activeColor;
+      ctx.fillRect(W - 310, padT + 4, 12, 12);
+      ctx.fillStyle = textColor;
+      ctx.fillText('Your Selected Settings', W - 292, padT + 14);
+
+      ctx.fillStyle = scratchColor;
+      ctx.fillRect(W - 150, padT + 4, 12, 12);
+      ctx.fillStyle = textColor;
+      ctx.fillText('Scratch Baseline', W - 132, padT + 14);
+    }
+
+    function applyPreset(name) {
+      if (name === 'scratch') {
+        strategySlider.value = 0;
+        dataSlider.value = 0;
+        lrSlider.value = 1;
+      } else if (name === 'extraction') {
+        strategySlider.value = 1;
+        dataSlider.value = 0;
+        lrSlider.value = 1;
+      } else if (name === 'finetune') {
+        strategySlider.value = 2;
+        dataSlider.value = 1;
+        lrSlider.value = 0;
+      } else if (name === 'forgetting') {
+        strategySlider.value = 2;
+        dataSlider.value = 1;
+        lrSlider.value = 2;
+      }
+      animateSimulation();
+    }
+
+    function animateSimulation() {
+      if (animFrame) cancelAnimationFrame(animFrame);
+      currentMaxEpoch = 1;
+      let lastTick = performance.now();
+
+      function step(now) {
+        if (now - lastTick >= 22) {
+          currentMaxEpoch = Math.min(TOTAL_EPOCHS, currentMaxEpoch + 2);
+          lastTick = now;
+          updateUI(currentMaxEpoch);
+        }
+        if (currentMaxEpoch < TOTAL_EPOCHS) {
+          animFrame = requestAnimationFrame(step);
+        }
+      }
+      updateUI(1);
+      animFrame = requestAnimationFrame(step);
+    }
+
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-btn').forEach(b => {
+          b.classList.remove('border-[var(--primary)]', 'bg-[var(--secondary)]');
+          b.classList.add('border-[var(--border)]');
+        });
+        btn.classList.remove('border-[var(--border)]');
+        btn.classList.add('border-[var(--primary)]', 'bg-[var(--secondary)]');
+        applyPreset(btn.dataset.preset);
+      });
+    });
+
+    [strategySlider, dataSlider, lrSlider].forEach(el => {
+      el.addEventListener('input', () => updateUI(TOTAL_EPOCHS));
+    });
+
+    document.getElementById('btnRunSim').addEventListener('click', animateSimulation);
+    document.getElementById('btnReset').addEventListener('click', () => applyPreset('extraction'));
+
+    updateUI(TOTAL_EPOCHS);
+  </script>
+</body>
+</html>

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VGG vs. ResNet vs. Transformers Simulator</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      color-scheme: light dark;
+      accent-color: #0d9488;
+    }
+
+    /* Progressive enhancement fallback per brand-consistent-forms guidance */
+    @supports not (accent-color: #0d9488) {
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 8px;
+        background: linear-gradient(to right, #0d9488 var(--progress, 50%), #94a3b8 var(--progress, 50%));
+        border-radius: 4px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: #0d9488;
+        cursor: pointer;
+        margin-top: -4px;
+      }
+      input[type="range"]::-moz-range-track {
+        width: 100%;
+        height: 8px;
+        background: #94a3b8;
+        border-radius: 4px;
+      }
+      input[type="range"]::-moz-range-thumb {
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: #0d9488;
+        cursor: pointer;
+      }
+      input[type="range"]::-moz-range-progress {
+        background-color: #0d9488;
+        height: 8px;
+        border-radius: 4px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-5 space-y-5">
+
+  <!-- Header -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+      <span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-[var(--secondary)] text-[var(--foreground)] mb-1">
+        Architecture Comparison Simulator
+      </span>
+      <h1 class="text-xl font-bold text-[var(--foreground)]">VGG vs. ResNet vs. Transformers</h1>
+      <p class="text-sm text-[var(--muted-foreground)]">
+        Explore how the three foundational Transfer Learning architectures process data and handle deep networks.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button id="btnAnimate" type="button" class="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm hover:opacity-90 transition">
+        Animate 100 Epochs
+      </button>
+    </div>
+  </div>
+
+  <!-- 3 Architecture Selector Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <button type="button" data-arch="vgg" class="arch-btn text-left p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)] transition shadow-sm">
+      <div class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Architecture 1</div>
+      <div class="text-base font-bold text-[var(--foreground)] mt-0.5">VGG Series (VGG16 / VGG19)</div>
+      <div class="text-xs text-[var(--muted-foreground)] mt-1">
+        Stacks uniform 3x3 convolutions in a straight line. Great for textures and style, but suffers from vanishing gradients if stacked too deep.
+      </div>
+    </button>
+
+    <button type="button" data-arch="resnet" class="arch-btn text-left p-4 rounded-xl border border-[var(--primary)] bg-[var(--secondary)] transition shadow-sm">
+      <div class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Architecture 2</div>
+      <div class="text-base font-bold text-[var(--foreground)] mt-0.5">ResNet (Residual Networks)</div>
+      <div class="text-xs text-[var(--muted-foreground)] mt-1">
+        Adds shortcut "Skip Connections" that jump over layers. Solves the vanishing gradient problem so networks can scale to 50–150+ layers.
+      </div>
+    </button>
+
+    <button type="button" data-arch="transformer" class="arch-btn text-left p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)] transition shadow-sm">
+      <div class="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Architecture 3</div>
+      <div class="text-base font-bold text-[var(--foreground)] mt-0.5">Transformers (BERT / GPT)</div>
+      <div class="text-xs text-[var(--muted-foreground)] mt-1">
+        Uses Self-Attention to connect every word or image patch to every other part all at once, capturing long-range context.
+      </div>
+    </button>
+  </div>
+
+  <!-- Depth Slider + 3 Live Metrics -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+    <form class="lg:col-span-5 bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-3" onsubmit="return false;">
+      <div class="flex justify-between text-sm">
+        <label for="depthSlider" class="font-semibold text-[var(--foreground)]">Network Depth (Number of Layers):</label>
+        <span id="depthLabel" class="font-mono font-bold text-[var(--foreground)]">50 Layers</span>
+      </div>
+      <input type="range" id="depthSlider" min="10" max="100" step="10" value="50" class="w-full cursor-pointer" />
+      <div class="flex justify-between text-xs text-[var(--muted-foreground)]">
+        <span>10 Layers (Shallow)</span>
+        <span>50 Layers (Deep)</span>
+        <span>100 Layers (Ultra-Deep)</span>
+      </div>
+      <p id="archExplanation" class="text-xs text-[var(--muted-foreground)] pt-2 border-t border-[var(--border)] leading-relaxed">
+        Loading explanation...
+      </p>
+    </form>
+
+    <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 text-center shadow-sm">
+        <div class="text-xs text-[var(--muted-foreground)]">Core Mechanism</div>
+        <div id="statMech" class="text-sm font-bold text-[var(--foreground)] mt-1.5">Skip Connections (y = F(x) + x)</div>
+      </div>
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 text-center shadow-sm">
+        <div class="text-xs text-[var(--muted-foreground)]">Learning Signal Reaching Early Layers</div>
+        <div id="statSignal" class="text-lg font-bold text-[var(--foreground)] mt-1">70.4% (Strong)</div>
+      </div>
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 text-center shadow-sm">
+        <div class="text-xs text-[var(--muted-foreground)]">Best Real-World Use Case</div>
+        <div id="statUse" class="text-sm font-bold text-[var(--foreground)] mt-1.5">Image Classification & Detection</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two Visual Canvases Side-by-Side -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+    <!-- Left Canvas: How Information & Gradients Flow -->
+    <div class="lg:col-span-6 bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-2">
+      <div class="flex items-center justify-between">
+        <h2 id="diagramTitle" class="font-semibold text-base text-[var(--foreground)]">
+          1. How Signal Flows Inside ResNet
+        </h2>
+        <span class="text-xs text-[var(--muted-foreground)]">Visual Mechanism</span>
+      </div>
+      <canvas id="flowCanvas" width="560" height="260" class="w-full rounded-lg border border-[var(--border)]"></canvas>
+    </div>
+
+    <!-- Right Canvas: 100-Epoch Convergence Comparison -->
+    <div class="lg:col-span-6 bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-2">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-base text-[var(--foreground)]">
+          2. Test Accuracy Over 100 Epochs (At Selected Depth)
+        </h2>
+        <span id="epochBadge" class="text-xs font-mono text-[var(--muted-foreground)]">Epoch 100 / 100</span>
+      </div>
+      <canvas id="curveCanvas" width="560" height="260" class="w-full rounded-lg border border-[var(--border)]"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const TOTAL_EPOCHS = 100;
+    let selectedArch = 'resnet';
+    let currentMaxEpoch = TOTAL_EPOCHS;
+    let animFrame = null;
+
+    const depthSlider = document.getElementById('depthSlider');
+    const depthLabel = document.getElementById('depthLabel');
+    const archExplanation = document.getElementById('archExplanation');
+    const statMech = document.getElementById('statMech');
+    const statSignal = document.getElementById('statSignal');
+    const statUse = document.getElementById('statUse');
+    const diagramTitle = document.getElementById('diagramTitle');
+    const epochBadge = document.getElementById('epochBadge');
+
+    const flowCanvas = document.getElementById('flowCanvas');
+    const flowCtx = flowCanvas.getContext('2d');
+    const curveCanvas = document.getElementById('curveCanvas');
+    const curveCtx = curveCanvas.getContext('2d');
+
+    function updateSliderProgress(slider) {
+      if (!CSS.supports('accent-color', '#0d9488')) {
+        const min = Number(slider.min || 0);
+        const max = Number(slider.max || 100);
+        const val = Number(slider.value || 0);
+        const pct = ((val - min) / (max - min)) * 100;
+        slider.style.setProperty('--progress', `${pct}%`);
+      }
+    }
+
+    function computeMetrics(arch, depth) {
+      const vggSignal = Math.pow(0.90, depth) * 100;
+      const resnetSignal = Math.pow(0.993, depth) * 100;
+      const transSignal = Math.pow(0.995, depth) * 100;
+
+      // 100-epoch curves for all 3 architectures at the selected depth
+      const vggCurve = [];
+      const resnetCurve = [];
+      const transCurve = [];
+
+      // VGG degrades sharply when depth > 20 due to vanishing gradients
+      const vggMax = depth <= 20 ? 90.0 : Math.max(38.0, 90.0 - (depth - 20) * 0.72);
+      const vggSpeed = depth <= 20 ? 18.0 : 42.0;
+
+      // ResNet thrives at 50-100 layers thanks to skip connections
+      const resnetMax = depth <= 20 ? 91.5 : Math.min(96.5, 92.0 + (depth - 20) * 0.06);
+      const resnetSpeed = 14.0;
+
+      // Transformer excels with global attention + residual connections
+      const transMax = depth <= 20 ? 93.0 : Math.min(97.8, 94.0 + (depth - 20) * 0.05);
+      const transSpeed = 11.5;
+
+      for (let ep = 1; ep <= TOTAL_EPOCHS; ep++) {
+        vggCurve.push(50 + (vggMax - 50) * (1 - Math.exp(-ep / vggSpeed)));
+        resnetCurve.push(64 + (resnetMax - 64) * (1 - Math.exp(-ep / resnetSpeed)));
+        transCurve.push(68 + (transMax - 68) * (1 - Math.exp(-ep / transSpeed)));
+      }
+
+      return { vggSignal, resnetSignal, transSignal, vggCurve, resnetCurve, transCurve };
+    }
+
+    function drawFlowDiagram(arch, depth, metrics) {
+      const isLight = document.documentElement.classList.contains('light');
+      const bg = isLight ? '#ffffff' : '#18181b';
+      const textColor = isLight ? '#1e293b' : '#e4e4e7';
+      const mutedColor = isLight ? '#64748b' : '#a1a1aa';
+
+      const W = flowCanvas.width;
+      const H = flowCanvas.height;
+      flowCtx.clearRect(0, 0, W, H);
+      flowCtx.fillStyle = bg;
+      flowCtx.fillRect(0, 0, W, H);
+
+      const numNodes = 6;
+      const startX = 55;
+      const endX = W - 55;
+      const stepX = (endX - startX) / (numNodes - 1);
+      const centerY = H / 2 + 10;
+
+      if (arch === 'vgg') {
+        diagramTitle.textContent = '1. VGG: Straight 3x3 Chain (Signal Fades with Depth)';
+        // Draw chain of 6 representative layer blocks
+        for (let i = 0; i < numNodes; i++) {
+          const x = startX + i * stepX;
+          const layerNum = Math.round(1 + (i / (numNodes - 1)) * (depth - 1));
+          const signalStrength = Math.pow(0.90, layerNum);
+          const alpha = Math.max(0.15, signalStrength);
+
+          if (i < numNodes - 1) {
+            flowCtx.strokeStyle = `rgba(217, 119, 6, ${alpha})`;
+            flowCtx.lineWidth = 4;
+            flowCtx.beginPath();
+            flowCtx.moveTo(x + 28, centerY);
+            flowCtx.lineTo(x + stepX - 28, centerY);
+            flowCtx.stroke();
+          }
+
+          flowCtx.fillStyle = `rgba(217, 119, 6, ${alpha})`;
+          flowCtx.strokeStyle = '#b45309';
+          flowCtx.lineWidth = 1.5;
+          flowCtx.beginPath();
+          flowCtx.roundRect(x - 28, centerY - 26, 56, 52, 8);
+          flowCtx.fill();
+          flowCtx.stroke();
+
+          flowCtx.fillStyle = textColor;
+          flowCtx.font = 'bold 12px sans-serif';
+          flowCtx.textAlign = 'center';
+          flowCtx.fillText(`L${layerNum}`, x, centerY - 2);
+          flowCtx.font = '12px sans-serif';
+          flowCtx.fillText(`${Math.round(signalStrength * 100)}%`, x, centerY + 15);
+        }
+
+        flowCtx.fillStyle = mutedColor;
+        flowCtx.font = '12px sans-serif';
+        flowCtx.textAlign = 'center';
+        flowCtx.fillText(
+          depth > 20
+            ? 'Notice how the learning signal fades near 0% in deep layers (Vanishing Gradient)'
+            : 'At shallow depth (10–20 layers), VGG passes enough signal without shortcuts',
+          W / 2,
+          34
+        );
+      } else if (arch === 'resnet') {
+        diagramTitle.textContent = '1. ResNet: Skip Connection Bridges Keep Signal Strong';
+        for (let i = 0; i < numNodes; i++) {
+          const x = startX + i * stepX;
+          const layerNum = Math.round(1 + (i / (numNodes - 1)) * (depth - 1));
+          const signalStrength = Math.pow(0.993, layerNum);
+
+          if (i < numNodes - 1) {
+            // Main path
+            flowCtx.strokeStyle = '#0d9488';
+            flowCtx.lineWidth = 3;
+            flowCtx.beginPath();
+            flowCtx.moveTo(x + 28, centerY + 8);
+            flowCtx.lineTo(x + stepX - 28, centerY + 8);
+            flowCtx.stroke();
+
+            // Curved Skip Connection bridge (y = F(x) + x)
+            flowCtx.strokeStyle = '#1d4ed8';
+            flowCtx.lineWidth = 2.5;
+            flowCtx.beginPath();
+            flowCtx.moveTo(x, centerY - 20);
+            flowCtx.quadraticCurveTo(x + stepX / 2, centerY - 72, x + stepX, centerY - 20);
+            flowCtx.stroke();
+
+            flowCtx.fillStyle = '#1d4ed8';
+            flowCtx.font = 'bold 12px sans-serif';
+            flowCtx.textAlign = 'center';
+            flowCtx.fillText('+ x', x + stepX / 2, centerY - 50);
+          }
+
+          flowCtx.fillStyle = 'rgba(13, 148, 136, 0.85)';
+          flowCtx.strokeStyle = '#0f766e';
+          flowCtx.lineWidth = 1.5;
+          flowCtx.beginPath();
+          flowCtx.roundRect(x - 28, centerY - 20, 56, 52, 8);
+          flowCtx.fill();
+          flowCtx.stroke();
+
+          flowCtx.fillStyle = '#ffffff';
+          flowCtx.font = 'bold 12px sans-serif';
+          flowCtx.textAlign = 'center';
+          flowCtx.fillText(`L${layerNum}`, x, centerY + 4);
+          flowCtx.font = '12px sans-serif';
+          flowCtx.fillText(`${Math.round(signalStrength * 100)}%`, x, centerY + 21);
+        }
+
+        flowCtx.fillStyle = mutedColor;
+        flowCtx.font = '12px sans-serif';
+        flowCtx.textAlign = 'center';
+        flowCtx.fillText('Blue arches (+ x) are Skip Connections: gradients travel across 100 layers without vanishing', W / 2, 28);
+      } else {
+        diagramTitle.textContent = '1. Transformer: Global Self-Attention Links Distant Words';
+        const words = ['The', 'trophy', 'did', 'not', 'fit', 'because', 'it', 'was', 'big'];
+        const wStep = (W - 70) / (words.length - 1);
+        const topY = 72;
+        const botY = 205;
+        const itIdx = 6; // 'it'
+
+        // Draw attention lines from 'it' (bottom) to all words (top)
+        const weights = [0.02, 0.48, 0.01, 0.01, 0.04, 0.02, 0.24, 0.02, 0.16];
+        words.forEach((w, idx) => {
+          const xTop = 35 + idx * wStep;
+          const xIt = 35 + itIdx * wStep;
+          const wt = weights[idx];
+          flowCtx.strokeStyle = `rgba(29, 78, 216, ${Math.max(0.12, wt * 1.9)})`;
+          flowCtx.lineWidth = Math.max(1, wt * 14);
+          flowCtx.beginPath();
+          flowCtx.moveTo(xIt, botY - 18);
+          flowCtx.lineTo(xTop, topY + 18);
+          flowCtx.stroke();
+
+          // Top word box
+          flowCtx.fillStyle = wt > 0.12 ? '#1d4ed8' : (isLight ? '#e2e8f0' : '#27272a');
+          flowCtx.beginPath();
+          flowCtx.roundRect(xTop - 26, topY - 14, 52, 28, 6);
+          flowCtx.fill();
+
+          flowCtx.fillStyle = wt > 0.12 ? '#ffffff' : textColor;
+          flowCtx.font = 'bold 12px sans-serif';
+          flowCtx.textAlign = 'center';
+          flowCtx.fillText(w, xTop, topY + 4);
+        });
+
+        // Query node at bottom ('it')
+        const xIt = 35 + itIdx * wStep;
+        flowCtx.fillStyle = '#0d9488';
+        flowCtx.beginPath();
+        flowCtx.roundRect(xIt - 65, botY - 16, 130, 32, 8);
+        flowCtx.fill();
+        flowCtx.fillStyle = '#ffffff';
+        flowCtx.font = 'bold 12px sans-serif';
+        flowCtx.fillText('Query Word: "it"', xIt, botY + 4);
+
+        flowCtx.fillStyle = mutedColor;
+        flowCtx.font = '12px sans-serif';
+        flowCtx.textAlign = 'center';
+        flowCtx.fillText('Self-Attention connects "it" directly to "trophy" (48%) and "big" (16%) across the whole sentence', W / 2, 28);
+      }
+    }
+
+    function drawCurves(metrics, maxEpoch) {
+      const isLight = document.documentElement.classList.contains('light');
+      const bg = isLight ? '#ffffff' : '#18181b';
+      const gridColor = isLight ? '#e2e8f0' : '#27272a';
+      const textColor = isLight ? '#1e293b' : '#e4e4e7';
+
+      const W = curveCanvas.width;
+      const H = curveCanvas.height;
+      curveCtx.clearRect(0, 0, W, H);
+      curveCtx.fillStyle = bg;
+      curveCtx.fillRect(0, 0, W, H);
+
+      const padL = 46, padR = 24, padT = 28, padB = 34;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      curveCtx.strokeStyle = gridColor;
+      curveCtx.lineWidth = 1;
+      curveCtx.font = '12px sans-serif';
+      curveCtx.fillStyle = textColor;
+
+      for (let pct = 25; pct <= 100; pct += 25) {
+        const y = padT + plotH - ((pct - 25) / 75) * plotH;
+        curveCtx.beginPath();
+        curveCtx.setLineDash([4, 4]);
+        curveCtx.moveTo(padL, y);
+        curveCtx.lineTo(W - padR, y);
+        curveCtx.stroke();
+        curveCtx.setLineDash([]);
+        curveCtx.fillText(`${pct}%`, 8, y + 4);
+      }
+
+      [1, 20, 40, 60, 80, 100].forEach(ep => {
+        const x = padL + ((ep - 1) / (TOTAL_EPOCHS - 1)) * plotW;
+        curveCtx.fillText(`Ep ${ep}`, x - 14, H - 10);
+      });
+
+      function plotCurve(curve, color, isSelected) {
+        curveCtx.strokeStyle = color;
+        curveCtx.lineWidth = isSelected ? 3.2 : 1.8;
+        curveCtx.globalAlpha = isSelected ? 1.0 : 0.45;
+        curveCtx.beginPath();
+        for (let i = 0; i < maxEpoch; i++) {
+          const x = padL + (i / (TOTAL_EPOCHS - 1)) * plotW;
+          const y = padT + plotH - ((curve[i] - 25) / 75) * plotH;
+          if (i === 0) curveCtx.moveTo(x, y);
+          else curveCtx.lineTo(x, y);
+        }
+        curveCtx.stroke();
+        curveCtx.globalAlpha = 1.0;
+      }
+
+      plotCurve(metrics.vggCurve, '#d97706', selectedArch === 'vgg');
+      plotCurve(metrics.resnetCurve, '#0d9488', selectedArch === 'resnet');
+      plotCurve(metrics.transCurve, '#1d4ed8', selectedArch === 'transformer');
+
+      // Legend
+      const items = [
+        { label: 'Transformer', color: '#1d4ed8' },
+        { label: 'ResNet', color: '#0d9488' },
+        { label: 'VGG', color: '#d97706' }
+      ];
+      items.forEach((it, idx) => {
+        const lx = W - 290 + idx * 95;
+        curveCtx.fillStyle = it.color;
+        curveCtx.fillRect(lx, padT + 2, 10, 10);
+        curveCtx.fillStyle = textColor;
+        curveCtx.fillText(it.label, lx + 14, padT + 11);
+      });
+    }
+
+    function updateUI(maxEpoch = TOTAL_EPOCHS) {
+      updateSliderProgress(depthSlider);
+      const depth = Number(depthSlider.value);
+      depthLabel.textContent = `${depth} Layers`;
+      epochBadge.textContent = `Epoch ${maxEpoch} / ${TOTAL_EPOCHS}`;
+
+      const metrics = computeMetrics(selectedArch, depth);
+
+      if (selectedArch === 'vgg') {
+        statMech.textContent = 'Stacked 3x3 Convolutions';
+        statSignal.textContent = `${metrics.vggSignal.toFixed(1)}% (${depth > 20 ? 'Vanishing!' : 'Healthy'})`;
+        statUse.textContent = 'Image Style & Texture Extraction';
+        archExplanation.textContent = depth > 20
+          ? `At ${depth} layers, VGG struggles because it has no shortcut connections. As errors travel backward through ${depth} layers in a row, the signal shrinks to ${metrics.vggSignal.toFixed(1)}% (Vanishing Gradient Problem), dragging down accuracy.`
+          : `At ${depth} layers, VGG works well! Its simple, uniform 3x3 filters are great at capturing image textures and styles, though it uses more memory than ResNet.`;
+      } else if (selectedArch === 'resnet') {
+        statMech.textContent = 'Skip Connections (y = F(x) + x)';
+        statSignal.textContent = `${metrics.resnetSignal.toFixed(1)}% (Strong Highway)`;
+        statUse.textContent = 'General Vision Feature Extraction';
+        archExplanation.textContent = `Even at ${depth} layers, ResNet keeps ${metrics.resnetSignal.toFixed(1)}% of its learning signal alive! Its Skip Connections act like an express highway that jumps over layers so the network never suffers from vanishing gradients.`;
+      } else {
+        statMech.textContent = 'Global Self-Attention + Skip Connections';
+        statSignal.textContent = `${metrics.transSignal.toFixed(1)}% (Global Context)`;
+        statUse.textContent = 'Language (BERT/GPT) & Vision (ViT)';
+        archExplanation.textContent = `Instead of scanning images through tiny 3x3 windows like VGG or ResNet, Transformers use Self-Attention to compare every word (or image patch) to every other part in a single step—while also using ResNet-style skip connections to stay deep!`;
+      }
+
+      drawFlowDiagram(selectedArch, depth, metrics);
+      drawCurves(metrics, maxEpoch);
+    }
+
+    function animateEpochs() {
+      if (animFrame) cancelAnimationFrame(animFrame);
+      currentMaxEpoch = 1;
+      let lastTick = performance.now();
+
+      function step(now) {
+        if (now - lastTick >= 22) {
+          currentMaxEpoch = Math.min(TOTAL_EPOCHS, currentMaxEpoch + 2);
+          lastTick = now;
+          updateUI(currentMaxEpoch);
+        }
+        if (currentMaxEpoch < TOTAL_EPOCHS) {
+          animFrame = requestAnimationFrame(step);
+        }
+      }
+      updateUI(1);
+      animFrame = requestAnimationFrame(step);
+    }
+
+    document.querySelectorAll('.arch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.arch-btn').forEach(b => {
+          b.classList.remove('border-[var(--primary)]', 'bg-[var(--secondary)]');
+          b.classList.add('border-[var(--border)]', 'bg-[var(--card)]');
+        });
+        btn.classList.remove('border-[var(--border)]', 'bg-[var(--card)]');
+        btn.classList.add('border-[var(--primary)]', 'bg-[var(--secondary)]');
+        selectedArch = btn.dataset.arch;
+        animateEpochs();
+      });
+    });
+
+    depthSlider.addEventListener('input', () => updateUI(TOTAL_EPOCHS));
+    document.getElementById('btnAnimate').addEventListener('click', animateEpochs);
+
+    updateUI(TOTAL_EPOCHS);
+  </script>
+</body>
+</html>
